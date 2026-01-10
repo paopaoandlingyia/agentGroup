@@ -7,26 +7,26 @@ type DbStoreName = "meta" | "agents" | "sessions";
 
 export type StoredMessage =
   | {
-      id: string;
-      kind: "user";
-      content: string;
-      images?: string[];
-      created_at: number;
-    }
+    id: string;
+    kind: "user";
+    content: string;
+    images?: string[];
+    created_at: number;
+  }
   | {
-      id: string;
-      kind: "agent";
-      speaker: string;
-      content: string;
-      images?: string[];
-      created_at: number;
-    }
+    id: string;
+    kind: "agent";
+    speaker: string;
+    content: string;
+    images?: string[];
+    created_at: number;
+  }
   | {
-      id: string;
-      kind: "system";
-      content: string;
-      created_at: number;
-    };
+    id: string;
+    kind: "system";
+    content: string;
+    created_at: number;
+  };
 
 export type StoredSession = {
   id: string;
@@ -360,5 +360,26 @@ export async function dbImportBundle(bundle: ExportBundleV1): Promise<void> {
   tx.objectStore("sessions").clear();
   for (const agent of bundle.agents) tx.objectStore("agents").put(agent);
   for (const session of bundle.sessions) tx.objectStore("sessions").put(session);
+  await _txDone(tx);
+}
+
+// Global Settings (Meta)
+export async function dbGetUseProxy(): Promise<boolean> {
+  try {
+    const db = await _openDb();
+    const tx = db.transaction("meta", "readonly");
+    const val = await _req(tx.objectStore("meta").get("use_proxy"));
+    await _txDone(tx);
+    // 默认为 true
+    return val !== false;
+  } catch {
+    return true;
+  }
+}
+
+export async function dbSetUseProxy(useProxy: boolean): Promise<void> {
+  const db = await _openDb();
+  const tx = db.transaction("meta", "readwrite");
+  tx.objectStore("meta").put(useProxy, "use_proxy");
   await _txDone(tx);
 }
