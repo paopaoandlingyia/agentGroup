@@ -58,6 +58,8 @@ export default function Home() {
     onError: (msg) => toast.error(msg)
   });
 
+  const [useProxy, setUseProxy] = useState(true);
+
   const {
     transcript,
     setTranscript,
@@ -70,6 +72,7 @@ export default function Home() {
     activeSessionId,
     agents,
     globalPrompt: activeSessionData?.global_prompt,
+    useProxy: useProxy,
     onError: (msg) => toast.error(msg)
   });
 
@@ -109,13 +112,16 @@ export default function Home() {
     let mounted = true;
 
     const init = async () => {
-      // 并行加载 agents 和 sessions
-      const [, loadedSessions] = await Promise.all([
+      // 并行加载 agents, sessions 和 settings
+      const { dbGetUseProxy } = await import("@/lib/local-db");
+      const [, loadedSessions, loadedUseProxy] = await Promise.all([
         loadAgents(),
-        loadSessions()
+        loadSessions(),
+        dbGetUseProxy()
       ]);
 
       if (!mounted) return;
+      setUseProxy(loadedUseProxy);
 
       // 恢复上次的 session
       const savedId = window.localStorage.getItem("agent_group_session_id");
@@ -214,6 +220,12 @@ export default function Home() {
       console.error("Failed to edit message:", e);
       toast.error("编辑失败");
     }
+  };
+
+  const handleUseProxyChange = async (val: boolean) => {
+    setUseProxy(val);
+    const { dbSetUseProxy } = await import("@/lib/local-db");
+    await dbSetUseProxy(val);
   };
 
   const handleDeleteMessage = async (messageId: string) => {
@@ -384,8 +396,8 @@ export default function Home() {
                 className="h-8 gap-1.5 text-xs px-2 md:px-3"
                 onClick={() => setIsDataModalOpen(true)}
               >
-                <Database className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">数据</span>
+                <Settings2 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">系统设置</span>
               </Button>
               <Button
                 variant="outline"
@@ -470,6 +482,8 @@ export default function Home() {
         activeSessionId={activeSessionId}
         onClose={() => setIsDataModalOpen(false)}
         onImported={handleImportedData}
+        useProxy={useProxy}
+        onUseProxyChange={handleUseProxyChange}
       />
     </div>
   );
