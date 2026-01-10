@@ -17,6 +17,7 @@ export type Agent = {
     base_url?: string | null;
     api_key?: string | null;
     stream?: boolean;  // 是否启用流式输出，默认 true
+    order?: number;    // 排序顺序，越小越靠前
 };
 
 // === Session 相关 ===
@@ -27,6 +28,7 @@ export type SessionSummary = {
     global_prompt: string;
     created_at: number;
     message_count: number;
+    order?: number;    // 排序顺序，越小越靠前
 };
 
 export type SessionDetail = SessionSummary & {
