@@ -59,6 +59,7 @@ export default function Home() {
   });
 
   const [useProxy, setUseProxy] = useState(true);
+  const [theme, setTheme] = useState<"light" | "dark" | "system">("system");
 
   const {
     transcript,
@@ -113,15 +114,18 @@ export default function Home() {
 
     const init = async () => {
       // 并行加载 agents, sessions 和 settings
-      const { dbGetUseProxy } = await import("@/lib/local-db");
-      const [, loadedSessions, loadedUseProxy] = await Promise.all([
+      const { dbGetUseProxy, dbGetTheme } = await import("@/lib/local-db");
+      const [, loadedSessions, loadedUseProxy, loadedTheme] = await Promise.all([
         loadAgents(),
         loadSessions(),
-        dbGetUseProxy()
+        dbGetUseProxy(),
+        dbGetTheme()
       ]);
 
       if (!mounted) return;
       setUseProxy(loadedUseProxy);
+      setTheme(loadedTheme);
+      applyTheme(loadedTheme);
 
       // 恢复上次的 session
       const savedId = window.localStorage.getItem("agent_group_session_id");
@@ -228,6 +232,59 @@ export default function Home() {
     await dbSetUseProxy(val);
   };
 
+  const applyTheme = (mode: "light" | "dark" | "system") => {
+    const root = document.documentElement;
+    if (mode === "system") {
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      root.classList.toggle("dark", prefersDark);
+    } else {
+      root.classList.toggle("dark", mode === "dark");
+    }
+  };
+
+  const handleThemeChange = async (mode: "light" | "dark" | "system") => {
+    setTheme(mode);
+    applyTheme(mode);
+    const { dbSetTheme } = await import("@/lib/local-db");
+    await dbSetTheme(mode);
+  };
+
+  const handleCopyAgent = async (agent: Agent) => {
+    // 生成一个不重复的名称
+    let copyName = `${agent.name}-副本`;
+    let counter = 1;
+    while (agents.some(a => a.name === copyName)) {
+      counter++;
+      copyName = `${agent.name}-副本${counter}`;
+    }
+    const newAgent: Agent = {
+      ...agent,
+      name: copyName
+    };
+    // 直接打开编辑模态框，让用户可以修改名称后保存
+    setIsCreatingAgent(true);
+    setEditingAgent(newAgent);
+  };
+
+  const handleAgentsReorder = async (orderedNames: string[]) => {
+    // 立即更新 UI
+    const reordered = orderedNames
+      .map(name => agents.find(a => a.name === name))
+      .filter((a): a is Agent => !!a);
+    setAgents(reordered);
+    // 持久化到 IndexedDB
+    const { dbUpdateAgentsOrder } = await import("@/lib/local-db");
+    await dbUpdateAgentsOrder(orderedNames);
+  };
+
+  const handleSessionsReorder = async (orderedIds: string[]) => {
+    // 在 useSessions hook 中没有暴露 setSessions，所以我们需要重新加载
+    // 先持久化，然后重新加载
+    const { dbUpdateSessionsOrder } = await import("@/lib/local-db");
+    await dbUpdateSessionsOrder(orderedIds);
+    await loadSessions();
+  };
+
   const handleDeleteMessage = async (messageId: string) => {
     if (!activeSessionId) return;
     if (!confirm("确定要删除这条消息吗？")) return;
@@ -314,11 +371,14 @@ export default function Home() {
             onSessionSelect={setActiveSessionId}
             onSessionCreate={createSession}
             onSessionDelete={handleDeleteSession}
+            onSessionsReorder={handleSessionsReorder}
             agents={agents}
             onAgentEdit={setEditingAgent}
             onAgentCreate={openCreateAgentModal}
             onAgentDelete={handleDeleteAgent}
+            onAgentCopy={handleCopyAgent}
             onAgentInvoke={invokeAgent}
+            onAgentsReorder={handleAgentsReorder}
             isLoading={isLoading}
           />
         </aside>
@@ -346,11 +406,14 @@ export default function Home() {
                   onSessionSelect={setActiveSessionId}
                   onSessionCreate={createSession}
                   onSessionDelete={handleDeleteSession}
+                  onSessionsReorder={handleSessionsReorder}
                   agents={agents}
                   onAgentEdit={setEditingAgent}
                   onAgentCreate={openCreateAgentModal}
                   onAgentDelete={handleDeleteAgent}
+                  onAgentCopy={handleCopyAgent}
                   onAgentInvoke={invokeAgent}
+                  onAgentsReorder={handleAgentsReorder}
                   isLoading={isLoading}
                   onMobileClose={() => setIsMobileSidebarOpen(false)}
                 />
@@ -394,15 +457,6 @@ export default function Home() {
                 variant="outline"
                 size="sm"
                 className="h-8 gap-1.5 text-xs px-2 md:px-3"
-                onClick={() => setIsDataModalOpen(true)}
-              >
-                <Settings2 className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">系统设置</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1.5 text-xs px-2 md:px-3"
                 disabled={!activeSessionId}
                 onClick={() => {
                   if (activeSessionId) {
@@ -411,7 +465,16 @@ export default function Home() {
                 }}
               >
                 <Settings2 className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">设置讨论组</span>
+                <span className="hidden sm:inline">讨论组设置</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 text-xs px-2 md:px-3"
+                onClick={() => setIsDataModalOpen(true)}
+              >
+                <Settings2 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">系统设置</span>
               </Button>
             </div>
           </header>
@@ -439,6 +502,7 @@ export default function Home() {
             pendingImages={pendingImages}
             onImageAdd={(base64) => setPendingImages(prev => [...prev, base64])}
             onImageRemove={(idx) => setPendingImages(prev => prev.filter((_, i) => i !== idx))}
+            onAgentInvoke={invokeAgent}
           />
         </main>
       </div>
@@ -484,6 +548,8 @@ export default function Home() {
         onImported={handleImportedData}
         useProxy={useProxy}
         onUseProxyChange={handleUseProxyChange}
+        theme={theme}
+        onThemeChange={handleThemeChange}
       />
     </div>
   );
