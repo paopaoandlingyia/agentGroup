@@ -102,7 +102,7 @@ export function ChatInput({
     };
 
     return (
-        <footer className="p-3 sm:p-4 bg-white/80 backdrop-blur border-t">
+        <footer className="p-3 sm:p-4 bg-card/80 backdrop-blur border-t">
             {/* Pending Images Preview */}
             {pendingImages.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-3 max-w-3xl mx-auto">
