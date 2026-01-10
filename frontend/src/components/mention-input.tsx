@@ -20,6 +20,7 @@ interface MentionInputProps {
     placeholder?: string;
     disabled?: boolean;
     className?: string;
+    textareaClassName?: string;
 }
 
 export function MentionInput({
@@ -29,7 +30,8 @@ export function MentionInput({
     agents,
     placeholder = "输入消息…（使用 @ 召唤 Agent）",
     disabled = false,
-    className
+    className,
+    textareaClassName
 }: MentionInputProps) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [showMentions, setShowMentions] = useState(false);
@@ -180,8 +182,7 @@ export function MentionInput({
             }
         }
 
-        // 正常的 Enter 提交（无 Shift）
-        if (e.key === "Enter" && !e.shiftKey && !showMentions) {
+        if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !showMentions) {
             e.preventDefault();
             onSubmit();
         }
@@ -196,7 +197,10 @@ export function MentionInput({
                 onKeyDown={handleKeyDown}
                 placeholder={placeholder}
                 disabled={disabled}
-                className="min-h-[56px] w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className={cn(
+                    "min-h-[56px] w-full resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+                    textareaClassName
+                )}
                 onBlur={() => {
                     // 延迟关闭，以便点击菜单项有时间触发
                     setTimeout(() => setShowMentions(false), 150);
