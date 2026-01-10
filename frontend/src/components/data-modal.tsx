@@ -1,18 +1,22 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Download, Upload, X, Settings2, Globe, ShieldCheck } from "lucide-react";
+import { Download, Upload, X, Settings2, Globe, ShieldCheck, Sun, Moon, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { exportAsJson, exportAsZip, importFromFile, makeExportFilename } from "@/lib/backup";
+import type { ThemeMode } from "@/lib/local-db";
 
 interface DataModalProps {
   isOpen: boolean;
   activeSessionId: string | null;
   onClose: () => void;
   onImported: (activeSessionId: string | null) => void | Promise<void>;
-  // 新增 proxy 属性
+  // Proxy 属性
   useProxy: boolean;
   onUseProxyChange: (val: boolean) => void;
+  // Theme 属性
+  theme: ThemeMode;
+  onThemeChange: (mode: ThemeMode) => void;
 }
 
 function downloadBlob(blob: Blob, filename: string) {
@@ -32,7 +36,9 @@ export function DataModal({
   onClose,
   onImported,
   useProxy,
-  onUseProxyChange
+  onUseProxyChange,
+  theme,
+  onThemeChange
 }: DataModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isBusy, setIsBusy] = useState(false);
@@ -95,6 +101,52 @@ export function DataModal({
         </div>
 
         <div className="space-y-6">
+          {/* Section 0: Theme */}
+          <section className="space-y-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground/80">
+              <Sun className="h-4 w-4" /> 主题外观
+            </div>
+            <div className="rounded-xl border bg-muted/20 p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">
+                  {theme === "light" ? "浅色模式" : theme === "dark" ? "深色模式" : "跟随系统"}
+                </span>
+                <div className="flex gap-1 p-1 rounded-lg bg-muted/50">
+                  <button
+                    onClick={() => onThemeChange("light")}
+                    className={`p-2 rounded-md transition-colors ${theme === "light"
+                        ? "bg-background shadow-sm text-primary"
+                        : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    title="浅色模式"
+                  >
+                    <Sun className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => onThemeChange("dark")}
+                    className={`p-2 rounded-md transition-colors ${theme === "dark"
+                        ? "bg-background shadow-sm text-primary"
+                        : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    title="深色模式"
+                  >
+                    <Moon className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => onThemeChange("system")}
+                    className={`p-2 rounded-md transition-colors ${theme === "system"
+                        ? "bg-background shadow-sm text-primary"
+                        : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    title="跟随系统"
+                  >
+                    <Monitor className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
           {/* Section 1: Network Mode */}
           <section className="space-y-3">
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground/80">
