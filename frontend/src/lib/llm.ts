@@ -23,9 +23,10 @@ function buildChatCompletionsUrl(baseUrl: string): string {
   return `${baseUrl}/chat/completions`;
 }
 
-function proxyUrl(): string | null {
+function proxyUrl(): string {
   const v = (process.env.NEXT_PUBLIC_LLM_PROXY_URL ?? "").trim();
-  return v ? v : null;
+  // 如果没配环境变量，默认走同域下的 /api/llm 路由
+  return v || "/api/llm";
 }
 
 type ProxyPayload = {
@@ -96,6 +97,7 @@ export async function openAiChatCompletion(params: {
   agent: Agent;
   messages: OpenAiChatMessage[];
   signal?: AbortSignal;
+  useProxy?: boolean; // 👈 新增参数，默认为 true
 }): Promise<string> {
   const apiKey = (params.agent.api_key ?? "").trim();
   if (!apiKey) throw new Error("该 Agent 未配置 API Key");
@@ -105,7 +107,9 @@ export async function openAiChatCompletion(params: {
   const temperature = params.agent.temperature ?? 0.7;
 
   const pUrl = proxyUrl();
-  if (pUrl) {
+  // 既然 pUrl 现在总是有值（默认为 /api/llm），
+  // 我们直接通过 params.useProxy 决定是否走代理
+  if (params.useProxy !== false) {
     let res: Response;
     try {
       const body: ProxyPayload = {
@@ -175,6 +179,7 @@ export async function openAiChatCompletionStream(params: {
   messages: OpenAiChatMessage[];
   signal?: AbortSignal;
   onDelta: (delta: string) => void;
+  useProxy?: boolean; // 👈 新增参数
 }): Promise<string> {
   const apiKey = (params.agent.api_key ?? "").trim();
   if (!apiKey) throw new Error("该 Agent 未配置 API Key");
@@ -184,7 +189,7 @@ export async function openAiChatCompletionStream(params: {
   const temperature = params.agent.temperature ?? 0.7;
 
   const pUrl = proxyUrl();
-  if (pUrl) {
+  if (params.useProxy !== false) {
     let res: Response;
     try {
       const body: ProxyPayload = {
