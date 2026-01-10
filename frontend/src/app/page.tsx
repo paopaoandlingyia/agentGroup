@@ -425,7 +425,7 @@ export default function Home() {
         {/* --- Main Chat --- */}
         <main className="flex flex-1 flex-col overflow-hidden rounded-xl border bg-card shadow-sm relative">
           {/* Header */}
-          <header className="flex items-center justify-between border-b px-4 py-3 bg-white/80 backdrop-blur">
+          <header className="flex items-center justify-between border-b px-4 py-3 bg-card/80 backdrop-blur">
             <div className="flex items-center gap-3 min-w-0">
               <Button
                 variant="ghost"
