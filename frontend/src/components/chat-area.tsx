@@ -38,7 +38,7 @@ export function ChatArea({
 
     if (isEmpty) {
         return (
-            <ScrollArea className="flex-1 p-4 bg-slate-50/30">
+            <ScrollArea className="flex-1 p-4 bg-background">
                 <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
                     请先选择或创建一个讨论组
                 </div>
@@ -47,7 +47,7 @@ export function ChatArea({
     }
 
     return (
-        <ScrollArea className="flex-1 p-4 bg-slate-50/30">
+        <ScrollArea className="flex-1 p-4 bg-background">
             <div className="flex flex-col gap-4 max-w-3xl mx-auto px-1">
                 {globalPrompt && (
                     <div className="mx-auto text-[10px] text-muted-foreground bg-muted/40 px-3 py-1 rounded-full mb-2">
@@ -74,7 +74,7 @@ export function ChatArea({
                                     ? "bg-primary text-primary-foreground rounded-tr-none"
                                     : item.kind === "system"
                                         ? "bg-muted/50 text-muted-foreground italic mx-auto text-[11px] border border-dashed rounded-lg"
-                                        : "bg-white border rounded-tl-none"
+                                        : "bg-card border rounded-tl-none"
                                     }`}>
 
                                     {/* Agent Header */}
