@@ -35,6 +35,7 @@ export type StoredSession = {
   created_at: number;
   updated_at: number;
   messages: StoredMessage[];
+  order?: number;
 };
 
 export type ExportBundleV1 = {
@@ -98,6 +99,7 @@ function _toSessionSummary(session: StoredSession): SessionSummary {
     global_prompt: session.global_prompt,
     created_at: session.created_at,
     message_count: session.messages.length,
+    order: session.order,
   };
 }
 
@@ -137,7 +139,8 @@ export async function dbGetAgents(): Promise<Agent[]> {
   const store = tx.objectStore("agents");
   const agents = await _getAll<Agent>(store);
   await _txDone(tx);
-  return agents;
+  // 按 order 排序，没有 order 的放最后
+  return agents.sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity));
 }
 
 export async function dbSetAgents(agents: Agent[]): Promise<void> {
@@ -169,8 +172,14 @@ export async function dbListSessions(): Promise<SessionSummary[]> {
   const store = tx.objectStore("sessions");
   const sessions = await _getAll<StoredSession>(store);
   await _txDone(tx);
+  // 按 order 排序，没有 order 的按 created_at 降序
   return sessions
-    .sort((a, b) => b.created_at - a.created_at)
+    .sort((a, b) => {
+      const orderA = a.order ?? Infinity;
+      const orderB = b.order ?? Infinity;
+      if (orderA !== orderB) return orderA - orderB;
+      return b.created_at - a.created_at;
+    })
     .map(_toSessionSummary);
 }
 
@@ -381,5 +390,59 @@ export async function dbSetUseProxy(useProxy: boolean): Promise<void> {
   const db = await _openDb();
   const tx = db.transaction("meta", "readwrite");
   tx.objectStore("meta").put(useProxy, "use_proxy");
+  await _txDone(tx);
+}
+
+// Theme Settings
+export type ThemeMode = "light" | "dark" | "system";
+
+export async function dbGetTheme(): Promise<ThemeMode> {
+  try {
+    const db = await _openDb();
+    const tx = db.transaction("meta", "readonly");
+    const val = await _req(tx.objectStore("meta").get("theme"));
+    await _txDone(tx);
+    if (val === "light" || val === "dark" || val === "system") return val;
+    return "system";
+  } catch {
+    return "system";
+  }
+}
+
+export async function dbSetTheme(theme: ThemeMode): Promise<void> {
+  const db = await _openDb();
+  const tx = db.transaction("meta", "readwrite");
+  tx.objectStore("meta").put(theme, "theme");
+  await _txDone(tx);
+}
+
+// Ordering Functions
+export async function dbUpdateAgentsOrder(orderedNames: string[]): Promise<void> {
+  const db = await _openDb();
+  const tx = db.transaction("agents", "readwrite");
+  const store = tx.objectStore("agents");
+  const agents = await _getAll<Agent>(store);
+
+  for (const agent of agents) {
+    const newOrder = orderedNames.indexOf(agent.name);
+    if (newOrder !== -1 && agent.order !== newOrder) {
+      store.put({ ...agent, order: newOrder });
+    }
+  }
+  await _txDone(tx);
+}
+
+export async function dbUpdateSessionsOrder(orderedIds: string[]): Promise<void> {
+  const db = await _openDb();
+  const tx = db.transaction("sessions", "readwrite");
+  const store = tx.objectStore("sessions");
+  const sessions = await _getAll<StoredSession>(store);
+
+  for (const session of sessions) {
+    const newOrder = orderedIds.indexOf(session.id);
+    if (newOrder !== -1 && session.order !== newOrder) {
+      store.put({ ...session, order: newOrder });
+    }
+  }
   await _txDone(tx);
 }
