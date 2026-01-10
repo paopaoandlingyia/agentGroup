@@ -10,6 +10,7 @@ interface UseChatOptions {
     activeSessionId: string | null;
     agents: Agent[];
     globalPrompt?: string;
+    useProxy?: boolean;
     onError?: (message: string) => void;
 }
 
@@ -53,7 +54,8 @@ function toAbortErrorName(err: unknown): string | null {
     return typeof name === "string" ? name : null;
 }
 
-export function useChat({ activeSessionId, agents, globalPrompt, onError }: UseChatOptions): UseChatReturn {
+export function useChat(params: UseChatOptions): UseChatReturn {
+    const { activeSessionId, agents, globalPrompt, onError } = params;
     const [transcript, setTranscript] = useState<TranscriptItem[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const abortControllerRef = useRef<AbortController | null>(null);
@@ -63,6 +65,7 @@ export function useChat({ activeSessionId, agents, globalPrompt, onError }: UseC
     const onErrorRef = useRef(onError);
     const agentsRef = useRef(agents);
     const globalPromptRef = useRef(globalPrompt);
+    const useProxyRef = useRef(params.useProxy);
     const transcriptRef = useRef(transcript);
 
     useEffect(() => {
@@ -80,6 +83,10 @@ export function useChat({ activeSessionId, agents, globalPrompt, onError }: UseC
     useEffect(() => {
         globalPromptRef.current = globalPrompt;
     }, [globalPrompt]);
+
+    useEffect(() => {
+        useProxyRef.current = params.useProxy;
+    }, [params.useProxy]);
 
     useEffect(() => {
         transcriptRef.current = transcript;
@@ -144,12 +151,18 @@ export function useChat({ activeSessionId, agents, globalPrompt, onError }: UseC
                 let full = "";
                 try {
                     if (agent.stream === false) {
-                        full = await openAiChatCompletion({ agent, messages: openAiMessages, signal: controller.signal });
+                        full = await openAiChatCompletion({
+                            agent,
+                            messages: openAiMessages,
+                            signal: controller.signal,
+                            useProxy: useProxyRef.current
+                        });
                     } else {
                         full = await openAiChatCompletionStream({
                             agent,
                             messages: openAiMessages,
                             signal: controller.signal,
+                            useProxy: useProxyRef.current,
                             onDelta: (delta) => {
                                 setTranscript((prev) =>
                                     prev.map((item) =>
@@ -230,12 +243,18 @@ export function useChat({ activeSessionId, agents, globalPrompt, onError }: UseC
 
             let full = "";
             if (agent.stream === false) {
-                full = await openAiChatCompletion({ agent, messages: openAiMessages, signal: controller.signal });
+                full = await openAiChatCompletion({
+                    agent,
+                    messages: openAiMessages,
+                    signal: controller.signal,
+                    useProxy: useProxyRef.current
+                });
             } else {
                 full = await openAiChatCompletionStream({
                     agent,
                     messages: openAiMessages,
                     signal: controller.signal,
+                    useProxy: useProxyRef.current,
                     onDelta: (delta) => {
                         setTranscript((prev) =>
                             prev.map((item) =>
