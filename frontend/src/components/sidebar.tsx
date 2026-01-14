@@ -13,6 +13,7 @@ import {
     closestCenter,
     KeyboardSensor,
     PointerSensor,
+    TouchSensor,
     useSensor,
     useSensors,
     DragEndEvent,
@@ -80,23 +81,15 @@ function SortableSessionItem({
         <div
             ref={setNodeRef}
             style={style}
-            className={`group relative flex items-center rounded-lg px-2 py-2 text-sm transition-all cursor-pointer overflow-hidden ${isActive
+            {...attributes}
+            {...listeners}
+            className={`group relative flex items-center rounded-lg px-4 py-2 text-sm transition-all cursor-pointer overflow-hidden ${isActive
                 ? "bg-primary/10 text-primary font-medium"
                 : "hover:bg-accent text-foreground/80"
                 } ${isDragging ? "z-50 shadow-lg" : ""}`}
             onClick={onClick}
             title={session.name}
         >
-            {/* Drag Handle */}
-            <div
-                {...attributes}
-                {...listeners}
-                className="flex-shrink-0 mr-1 cursor-grab active:cursor-grabbing p-1 rounded hover:bg-muted/50 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={(e) => e.stopPropagation()}
-            >
-                <GripVertical className="h-3 w-3" />
-            </div>
-
             <div className="flex flex-col min-w-0 flex-1 mr-2">
                 <span className="truncate">{session.name}</span>
                 <span className="text-[10px] text-muted-foreground truncate">
@@ -108,6 +101,7 @@ function SortableSessionItem({
                     variant="ghost"
                     size="icon"
                     className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                    onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
                         e.stopPropagation();
                         onDelete();
@@ -163,22 +157,15 @@ function SortableAgentItem({
         <div
             ref={setNodeRef}
             style={style}
-            className={`group relative rounded-lg border border-transparent p-2 hover:bg-accent/50 hover:border-border transition-all ${isDragging ? "z-50 shadow-lg bg-card" : ""
+            {...attributes}
+            {...listeners}
+            className={`group relative rounded-lg border border-transparent px-4 py-2.5 hover:bg-accent/50 hover:border-border transition-all cursor-default ${isDragging ? "z-50 shadow-lg bg-card" : ""
                 }`}
         >
             <div
-                className="grid items-center gap-2"
-                style={{ gridTemplateColumns: "20px 32px 1fr 68px" }}
+                className="grid items-center gap-3"
+                style={{ gridTemplateColumns: "32px 1fr auto" }}
             >
-                {/* Drag Handle */}
-                <div
-                    {...attributes}
-                    {...listeners}
-                    className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-muted/50 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                    <GripVertical className="h-3 w-3" />
-                </div>
-
                 <Avatar className="h-8 w-8 shadow-sm">
                     <AvatarImage src={agent.avatar_url || ""} />
                     <AvatarFallback className="bg-muted text-[10px]">
@@ -208,6 +195,7 @@ function SortableAgentItem({
                         className="h-7 w-7 rounded-full shadow-sm bg-background border hover:bg-primary/10 hover:text-primary transition-colors text-muted-foreground"
                         title={`直接召唤 ${agent.name} 回复`}
                         disabled={isLoading || !hasActiveSession}
+                        onPointerDown={(e) => e.stopPropagation()}
                         onClick={onInvoke}
                     >
                         <AtSign className="h-3.5 w-3.5" />
@@ -217,6 +205,7 @@ function SortableAgentItem({
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 rounded-full text-muted-foreground hover:bg-accent"
+                            onPointerDown={(e) => e.stopPropagation()}
                             onClick={onMenuToggle}
                         >
                             <MoreVertical className="h-3.5 w-3.5" />
@@ -225,6 +214,7 @@ function SortableAgentItem({
                         {isMenuOpen && (
                             <div
                                 ref={menuRef}
+                                onPointerDown={(e) => e.stopPropagation()}
                                 className="absolute right-0 top-full z-50 mt-1 w-32 rounded-md border bg-card p-1 shadow-lg animate-in fade-in zoom-in-95"
                             >
                                 <button
@@ -289,7 +279,13 @@ export function Sidebar({
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
-                distance: 5, // 需要移动 5px 才开始拖拽，避免误触
+                distance: 8, // 稍微增大移动阈值，确保点击按钮时不会误触发拖拽
+            },
+        }),
+        useSensor(TouchSensor, {
+            activationConstraint: {
+                delay: 300, // 移动端长按 300ms 开启拖拽
+                tolerance: 5,
             },
         }),
         useSensor(KeyboardSensor, {
