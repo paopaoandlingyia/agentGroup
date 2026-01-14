@@ -81,6 +81,8 @@ function SortableSessionItem({
         <div
             ref={setNodeRef}
             style={{ ...style, touchAction: "none" }}
+            {...attributes}
+            {...listeners}
             className={`group relative flex items-center rounded-lg px-4 py-2 text-sm transition-all cursor-pointer overflow-hidden ${isActive
                 ? "bg-primary/10 text-primary font-medium"
                 : "hover:bg-accent text-foreground/80"
