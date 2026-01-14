@@ -80,9 +80,7 @@ function SortableSessionItem({
     return (
         <div
             ref={setNodeRef}
-            style={style}
-            {...attributes}
-            {...listeners}
+            style={{ ...style, touchAction: "none" }}
             className={`group relative flex items-center rounded-lg px-4 py-2 text-sm transition-all cursor-pointer overflow-hidden ${isActive
                 ? "bg-primary/10 text-primary font-medium"
                 : "hover:bg-accent text-foreground/80"
@@ -156,10 +154,10 @@ function SortableAgentItem({
     return (
         <div
             ref={setNodeRef}
-            style={style}
+            style={{ ...style, touchAction: "none" }}
             {...attributes}
             {...listeners}
-            className={`group relative rounded-lg border border-transparent px-4 py-2.5 hover:bg-accent/50 hover:border-border transition-all cursor-default ${isDragging ? "z-50 shadow-lg bg-card" : ""
+            className={`group relative rounded-lg border border-transparent px-4 py-2.5 hover:bg-accent/50 hover:border-border transition-all cursor-pointer ${isDragging ? "z-50 shadow-lg bg-card" : ""
                 }`}
         >
             <div
