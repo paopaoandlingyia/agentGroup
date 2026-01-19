@@ -97,9 +97,24 @@ export function ChatInput({
     };
 
     const handleAgentSelect = (agentName: string) => {
-        onAgentInvoke(agentName);
+        const hasContent = value.trim().length > 0 || pendingImages.length > 0;
+
+        if (hasContent) {
+            // 有内容：插入 @AgentName 到开头，不自动发送
+            const prefix = `@${agentName} `;
+            // 检查是否已经有这个 @ 了，避免重复
+            if (!value.startsWith(prefix)) {
+                onChange(prefix + value);
+            }
+        } else {
+            // 无内容：直接触发 Agent（上帝视角）
+            onAgentInvoke(agentName);
+        }
         setIsAgentMenuOpen(false);
     };
+
+    // 判断当前模式
+    const hasContent = value.trim().length > 0 || pendingImages.length > 0;
 
     return (
         <footer className="p-3 sm:p-4 bg-card/80 backdrop-blur border-t">
@@ -129,22 +144,30 @@ export function ChatInput({
                 {isAgentMenuOpen && (
                     <div
                         ref={agentMenuRef}
-                        className="absolute bottom-full left-0 mb-2 w-64 rounded-xl border bg-white p-1 shadow-xl animate-in fade-in zoom-in-95 z-50 flex flex-col gap-1 max-h-[300px] overflow-y-auto"
+                        className="absolute bottom-full left-0 mb-2 w-72 rounded-xl border bg-card p-1.5 shadow-xl animate-in fade-in zoom-in-95 z-50 flex flex-col gap-1 max-h-[300px] overflow-y-auto custom-scrollbar"
                     >
-                        <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground border-b mb-1">
-                            选择 Agent 直接回复
+                        <div className="px-2.5 py-2 border-b border-border/50 mb-1">
+                            <div className="text-xs font-medium text-foreground">
+                                {hasContent ? "选择要 @ 的 Agent" : "选择 Agent 直接发言"}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground mt-0.5">
+                                {hasContent
+                                    ? "将在消息前插入 @，需手动发送"
+                                    : "Agent 将基于当前对话直接回复"
+                                }
+                            </div>
                         </div>
                         {agents.map((agent) => (
                             <button
                                 key={agent.name}
-                                className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm hover:bg-accent transition-colors text-left"
+                                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm hover:bg-accent transition-colors text-left"
                                 onClick={() => handleAgentSelect(agent.name)}
                             >
-                                <Avatar className="h-6 w-6">
+                                <Avatar className="h-7 w-7">
                                     <AvatarImage src={agent.avatar_url ?? undefined} />
                                     <AvatarFallback className="text-[10px]">{shortName(agent.name)}</AvatarFallback>
                                 </Avatar>
-                                <div className="flex flex-col overflow-hidden">
+                                <div className="flex flex-col overflow-hidden flex-1">
                                     <span className="truncate font-medium leading-none">{agent.name}</span>
                                     {agent.model && (
                                         <span className="truncate text-[10px] text-muted-foreground mt-0.5">
@@ -152,6 +175,9 @@ export function ChatInput({
                                         </span>
                                     )}
                                 </div>
+                                {hasContent && (
+                                    <span className="text-[10px] text-primary font-medium">@</span>
+                                )}
                             </button>
                         ))}
                     </div>
