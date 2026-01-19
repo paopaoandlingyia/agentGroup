@@ -1,15 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Settings2, X, Menu, Database } from "lucide-react";
+import { Settings2, X, Menu } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 
 // 自定义组件
-import { Sidebar } from "@/components/sidebar";
+import { SessionSidebar, MemberSidebar } from "@/components/sidebar";
 import { ChatArea } from "@/components/chat-area";
 import { ChatInput } from "@/components/chat-input";
 import { AgentModal } from "@/components/agent-modal";
@@ -23,7 +23,7 @@ import { useAgents } from "@/hooks/use-agents";
 import { useSessions } from "@/hooks/use-sessions";
 
 // Types
-import { Agent, TranscriptItem, shortName } from "@/types";
+import { Agent, TranscriptItem } from "@/types";
 
 
 export default function Home() {
@@ -80,6 +80,8 @@ export default function Home() {
   // --- UI State ---
 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isMobileMemberOpen, setIsMobileMemberOpen] = useState(false);
+  const [isMemberSidebarOpen, setIsMemberSidebarOpen] = useState(false); // 默认关闭，开启沉浸模式
 
   // Modals
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
@@ -108,12 +110,10 @@ export default function Home() {
 
   // --- Initialization ---
 
-  // 只在组件挂载时执行一次
   useEffect(() => {
     let mounted = true;
 
     const init = async () => {
-      // 并行加载 agents, sessions 和 settings
       const { dbGetUseProxy, dbGetTheme } = await import("@/lib/local-db");
       const [, loadedSessions, loadedUseProxy, loadedTheme] = await Promise.all([
         loadAgents(),
@@ -127,7 +127,6 @@ export default function Home() {
       setTheme(loadedTheme);
       applyTheme(loadedTheme);
 
-      // 恢复上次的 session
       const savedId = window.localStorage.getItem("agent_group_session_id");
       if (savedId && loadedSessions.some(s => s.id === savedId)) {
         setActiveSessionId(savedId);
@@ -140,9 +139,8 @@ export default function Home() {
 
     return () => { mounted = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // 空依赖，只在挂载时执行一次
+  }, []);
 
-  // 加载当前 session 的历史记录
   useEffect(() => {
     if (!activeSessionId) {
       setTranscript([]);
@@ -153,7 +151,7 @@ export default function Home() {
     let mounted = true;
 
     const load = async () => {
-      shouldSmoothScroll.current = false; // 加载历史时直接跳转
+      shouldSmoothScroll.current = false;
       const history = await loadSessionHistory(activeSessionId);
       if (mounted) {
         setTranscript(history);
@@ -163,7 +161,7 @@ export default function Home() {
 
     return () => { mounted = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSessionId]); // 只依赖 activeSessionId
+  }, [activeSessionId]);
 
   // --- Handlers ---
 
@@ -250,7 +248,6 @@ export default function Home() {
   };
 
   const handleCopyAgent = async (agent: Agent) => {
-    // 生成一个不重复的名称
     let copyName = `${agent.name}-副本`;
     let counter = 1;
     while (agents.some(a => a.name === copyName)) {
@@ -261,25 +258,20 @@ export default function Home() {
       ...agent,
       name: copyName
     };
-    // 直接打开编辑模态框，让用户可以修改名称后保存
     setIsCreatingAgent(true);
     setEditingAgent(newAgent);
   };
 
   const handleAgentsReorder = async (orderedNames: string[]) => {
-    // 立即更新 UI
     const reordered = orderedNames
       .map(name => agents.find(a => a.name === name))
       .filter((a): a is Agent => !!a);
     setAgents(reordered);
-    // 持久化到 IndexedDB
     const { dbUpdateAgentsOrder } = await import("@/lib/local-db");
     await dbUpdateAgentsOrder(orderedNames);
   };
 
   const handleSessionsReorder = async (orderedIds: string[]) => {
-    // 在 useSessions hook 中没有暴露 setSessions，所以我们需要重新加载
-    // 先持久化，然后重新加载
     const { dbUpdateSessionsOrder } = await import("@/lib/local-db");
     await dbUpdateSessionsOrder(orderedIds);
     await loadSessions();
@@ -303,8 +295,6 @@ export default function Home() {
   const handleForkMessage = async (messageId: string) => {
     const forkedId = await forkSession(messageId);
     if (forkedId) {
-      // forkSession 内部已经设置了 activeSessionId，
-      // 并且 useEffect 会自动加载新会话的历史
       toast.success("分支已创建，已切换到新会话");
     }
   };
@@ -358,74 +348,91 @@ export default function Home() {
   // --- Render ---
 
   return (
-    <div className="min-h-dvh bg-gradient-to-b from-background to-muted/30 p-2 md:p-4 font-sans selection:bg-primary/10">
+    <div className="min-h-dvh gradient-mesh-bg p-3 md:p-5 font-sans selection:bg-primary/10">
       <Toaster position="top-center" richColors />
 
-      <div className="mx-auto flex h-[calc(100dvh-2rem)] w-full max-w-7xl gap-4 relative overflow-hidden">
+      <div className="mx-auto flex h-[calc(100dvh-1.5rem)] md:h-[calc(100dvh-2.5rem)] w-full max-w-7xl gap-4 relative overflow-hidden">
 
-        {/* --- Sidebar (Desktop) --- */}
-        <aside className="hidden w-72 flex-col gap-4 md:flex flex-shrink-0">
-          <Sidebar
+        {/* --- Session Sidebar (Left) - 悬浮卡片 --- */}
+        <aside className="hidden w-72 flex-col md:flex flex-shrink-0 floating-card rounded-2xl overflow-hidden">
+          <SessionSidebar
             sessions={sessions}
             activeSessionId={activeSessionId}
             onSessionSelect={setActiveSessionId}
             onSessionCreate={createSession}
             onSessionDelete={handleDeleteSession}
             onSessionsReorder={handleSessionsReorder}
-            agents={agents}
-            onAgentEdit={setEditingAgent}
-            onAgentCreate={openCreateAgentModal}
-            onAgentDelete={handleDeleteAgent}
-            onAgentCopy={handleCopyAgent}
-            onAgentInvoke={invokeAgent}
-            onAgentsReorder={handleAgentsReorder}
-            isLoading={isLoading}
+            onSystemSettingsClick={() => setIsDataModalOpen(true)}
           />
         </aside>
 
-        {/* --- Sidebar (Mobile Drawer) --- */}
+        {/* --- Mobile Sidebar (Drawer) --- */}
         {isMobileSidebarOpen && (
           <div
             className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden animate-in fade-in"
             onClick={() => setIsMobileSidebarOpen(false)}
           >
             <div
-              className="absolute left-0 top-0 h-full w-[80%] max-w-sm bg-background p-4 shadow-xl animate-in slide-in-from-left duration-300 flex flex-col gap-4"
+              className="absolute left-0 top-0 h-full w-[80%] max-w-sm overlay-drawer shadow-xl animate-in slide-in-from-left duration-300 flex flex-col"
               onClick={e => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-bold text-lg">讨论组 & 成员</span>
+              <div className="flex items-center justify-between p-4 border-b">
+                <span className="font-bold text-lg">讨论组</span>
                 <Button variant="ghost" size="icon" onClick={() => setIsMobileSidebarOpen(false)}>
                   <X className="h-5 w-5" />
                 </Button>
               </div>
               <div className="flex-1 overflow-hidden">
-                <Sidebar
+                <SessionSidebar
                   sessions={sessions}
                   activeSessionId={activeSessionId}
-                  onSessionSelect={setActiveSessionId}
+                  onSessionSelect={(id) => { setActiveSessionId(id); setIsMobileSidebarOpen(false); }}
                   onSessionCreate={createSession}
                   onSessionDelete={handleDeleteSession}
                   onSessionsReorder={handleSessionsReorder}
-                  agents={agents}
-                  onAgentEdit={setEditingAgent}
-                  onAgentCreate={openCreateAgentModal}
-                  onAgentDelete={handleDeleteAgent}
-                  onAgentCopy={handleCopyAgent}
-                  onAgentInvoke={invokeAgent}
-                  onAgentsReorder={handleAgentsReorder}
-                  isLoading={isLoading}
-                  onMobileClose={() => setIsMobileSidebarOpen(false)}
+                  onSystemSettingsClick={() => { setIsDataModalOpen(true); setIsMobileSidebarOpen(false); }}
                 />
               </div>
             </div>
           </div>
         )}
 
-        {/* --- Main Chat --- */}
-        <main className="flex flex-1 flex-col overflow-hidden rounded-xl border bg-card shadow-sm relative">
+        {/* --- Mobile Member Drawer (Right) --- */}
+        {isMobileMemberOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden animate-in fade-in"
+            onClick={() => setIsMobileMemberOpen(false)}
+          >
+            <div
+              className="absolute right-0 top-0 h-full w-[80%] max-w-sm overlay-drawer shadow-xl animate-in slide-in-from-right duration-300 flex flex-col"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between p-4 border-b">
+                <span className="font-bold text-lg">群成员</span>
+                <Button variant="ghost" size="icon" onClick={() => setIsMobileMemberOpen(false)}>
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <MemberSidebar
+                  agents={agents}
+                  onAgentEdit={(agent) => { setEditingAgent(agent); setIsMobileMemberOpen(false); }}
+                  onAgentCreate={() => { openCreateAgentModal(); setIsMobileMemberOpen(false); }}
+                  onAgentDelete={handleDeleteAgent}
+                  onAgentCopy={handleCopyAgent}
+                  onAgentsReorder={handleAgentsReorder}
+                  isLoading={isLoading}
+                  hasActiveSession={!!activeSessionId}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- Main Chat Area - 悬浮卡片 --- */}
+        <main className="flex flex-1 flex-col overflow-hidden floating-card rounded-2xl relative">
           {/* Header */}
-          <header className="flex items-center justify-between border-b px-4 py-3 bg-card/80 backdrop-blur">
+          <header className="flex items-center justify-between border-b border-border/50 px-5 py-3.5 bg-gradient-to-r from-transparent via-muted/5 to-transparent">
             <div className="flex items-center gap-3 min-w-0">
               <Button
                 variant="ghost"
@@ -436,45 +443,39 @@ export default function Home() {
                 <Menu className="h-5 w-5" />
               </Button>
               <div className="flex flex-col min-w-0">
-                <h1 className="text-sm font-bold flex items-center gap-2 truncate">
+                <h1 className="text-sm font-bold truncate">
                   {activeSessionData?.name || "未选择讨论组"}
                 </h1>
-                <p className="text-[10px] text-muted-foreground flex items-center gap-1 min-h-[1.5em] max-w-md truncate">
-                  {activeSessionData?.global_prompt ? (
-                    <span className="truncate flex-1 text-blue-600/80 bg-blue-50 px-1 rounded">
-                      全局 Prompt: {activeSessionData.global_prompt}
-                    </span>
-                  ) : (
-                    <span>无全局 Prompt</span>
-                  )}
-                  <span className={`inline-block h-1.5 w-1.5 rounded-full ml-2 ${isLoading ? 'animate-pulse bg-green-500' : 'bg-transparent'}`} />
-                </p>
+                <div
+                  className="mt-0.5 flex items-center gap-1.5 px-1.5 py-0.5 rounded-md border border-transparent text-[10px] text-muted-foreground/70 transition-all cursor-pointer group hover:bg-muted/50 hover:border-border/50 hover:text-muted-foreground max-w-fit"
+                  onClick={() => {
+                    if (activeSessionId) {
+                      setEditingSession(sessions.find(s => s.id === activeSessionId) || null);
+                    }
+                  }}
+                  title="点击配置讨论组"
+                >
+                  <Settings2 className="h-3 w-3 opacity-40 group-hover:opacity-100 transition-opacity" />
+                  <span className="truncate max-w-[200px]">
+                    {activeSessionData?.global_prompt ? `全局 Prompt: ${activeSessionData.global_prompt}` : "无全局 Prompt"}
+                  </span>
+                  {isLoading && <span className="inline-block h-1 w-1 rounded-full bg-green-500/50 animate-pulse ml-1" />}
+                </div>
               </div>
             </div>
 
             <div className="flex gap-2 flex-shrink-0">
+              {/* Member Toggle (Now for all screen sizes) */}
               <Button
-                variant="outline"
+                variant={isMemberSidebarOpen ? "secondary" : "outline"}
                 size="sm"
-                className="h-8 gap-1.5 text-xs px-2 md:px-3"
-                disabled={!activeSessionId}
-                onClick={() => {
-                  if (activeSessionId) {
-                    setEditingSession(sessions.find(s => s.id === activeSessionId) || null);
-                  }
-                }}
+                className="h-8 gap-1.5 text-xs px-2 md:px-3 rounded-full transition-all duration-200"
+                onClick={() => setIsMemberSidebarOpen(!isMemberSidebarOpen)}
               >
-                <Settings2 className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">讨论组设置</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1.5 text-xs px-2 md:px-3"
-                onClick={() => setIsDataModalOpen(true)}
-              >
-                <Settings2 className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">系统设置</span>
+                <Avatar className="h-3.5 w-3.5">
+                  <AvatarFallback className="text-[6px] bg-primary text-primary-foreground font-bold">AG</AvatarFallback>
+                </Avatar>
+                <span className="hidden sm:inline">{isMemberSidebarOpen ? "收起成员" : `群成员(${agents.length})`}</span>
               </Button>
             </div>
           </header>
@@ -505,6 +506,33 @@ export default function Home() {
             onAgentInvoke={invokeAgent}
           />
         </main>
+
+        {/* --- Member Sidebar (Overlay Drawer) --- */}
+        {isMemberSidebarOpen && (
+          <div
+            className="absolute inset-0 z-30 flex justify-end"
+            onClick={() => setIsMemberSidebarOpen(false)}
+          >
+            {/* Background transparent layer to capture clicks to close */}
+            <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" />
+
+            <aside
+              className="relative w-72 h-full flex flex-col overlay-drawer rounded-l-2xl border-l-0 animate-in slide-in-from-right duration-300"
+              onClick={e => e.stopPropagation()}
+            >
+              <MemberSidebar
+                agents={agents}
+                onAgentEdit={(agent) => { setEditingAgent(agent); setIsMemberSidebarOpen(false); }}
+                onAgentCreate={() => { openCreateAgentModal(); setIsMemberSidebarOpen(false); }}
+                onAgentDelete={handleDeleteAgent}
+                onAgentCopy={handleCopyAgent}
+                onAgentsReorder={handleAgentsReorder}
+                isLoading={isLoading}
+                hasActiveSession={!!activeSessionId}
+              />
+            </aside>
+          </div>
+        )}
       </div>
 
       {/* --- Modals --- */}
