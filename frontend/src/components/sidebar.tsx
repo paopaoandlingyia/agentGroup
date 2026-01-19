@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useEffect } from "react";
-import { Plus, Trash2, MessageSquare, AtSign, MoreVertical, Settings2, Copy, GripVertical } from "lucide-react";
+import { Plus, Trash2, MessageSquare, MoreVertical, Settings2, Copy, Settings } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -26,29 +26,6 @@ import {
     verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-
-interface SidebarProps {
-    // Session 相关
-    sessions: SessionSummary[];
-    activeSessionId: string | null;
-    onSessionSelect: (id: string) => void;
-    onSessionCreate: () => void;
-    onSessionDelete: (id: string) => void;
-    onSessionsReorder: (orderedIds: string[]) => void;
-
-    // Agent 相关
-    agents: Agent[];
-    onAgentEdit: (agent: Agent) => void;
-    onAgentCreate: () => void;
-    onAgentDelete: (name: string) => void;
-    onAgentCopy: (agent: Agent) => void;
-    onAgentInvoke: (name: string) => void;
-    onAgentsReorder: (orderedNames: string[]) => void;
-    isLoading?: boolean;
-
-    // 移动端关闭
-    onMobileClose?: () => void;
-}
 
 // --- Sortable Session Item ---
 function SortableSessionItem({
@@ -83,10 +60,10 @@ function SortableSessionItem({
             style={{ ...style, touchAction: "none" }}
             {...attributes}
             {...listeners}
-            className={`group relative flex items-center rounded-lg px-4 py-2 text-sm transition-all cursor-pointer overflow-hidden ${isActive
-                ? "bg-primary/10 text-primary font-medium"
-                : "hover:bg-accent text-foreground/80"
-                } ${isDragging ? "z-50 shadow-lg" : ""}`}
+            className={`session-item group relative flex items-center rounded-xl px-4 py-2.5 text-sm cursor-pointer overflow-hidden ${isActive
+                ? "active"
+                : "text-foreground/80"
+                } ${isDragging ? "z-50 shadow-lg !transform-none" : ""}`}
             onClick={onClick}
             title={session.name}
         >
@@ -117,9 +94,6 @@ function SortableSessionItem({
 // --- Sortable Agent Item ---
 function SortableAgentItem({
     agent,
-    isLoading,
-    hasActiveSession,
-    onInvoke,
     onEdit,
     onCopy,
     onDelete,
@@ -130,7 +104,6 @@ function SortableAgentItem({
     agent: Agent;
     isLoading: boolean;
     hasActiveSession: boolean;
-    onInvoke: () => void;
     onEdit: () => void;
     onCopy: () => void;
     onDelete: () => void;
@@ -188,18 +161,7 @@ function SortableAgentItem({
                     </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-1">
-                    <Button
-                        variant="secondary"
-                        size="icon"
-                        className="h-7 w-7 rounded-full shadow-sm bg-background border hover:bg-primary/10 hover:text-primary transition-colors text-muted-foreground"
-                        title={`直接召唤 ${agent.name} 回复`}
-                        disabled={isLoading || !hasActiveSession}
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={onInvoke}
-                    >
-                        <AtSign className="h-3.5 w-3.5" />
-                    </Button>
+                <div className="flex items-center justify-end">
                     <div className="relative">
                         <Button
                             variant="ghost"
@@ -244,27 +206,118 @@ function SortableAgentItem({
     );
 }
 
-export function Sidebar({
+// --- SessionSidebar Component ---
+export function SessionSidebar({
     sessions,
     activeSessionId,
     onSessionSelect,
     onSessionCreate,
     onSessionDelete,
     onSessionsReorder,
+    onSystemSettingsClick,
+}: {
+    sessions: SessionSummary[];
+    activeSessionId: string | null;
+    onSessionSelect: (id: string) => void;
+    onSessionCreate: () => void;
+    onSessionDelete: (id: string) => void;
+    onSessionsReorder: (orderedIds: string[]) => void;
+    onSystemSettingsClick: () => void;
+}) {
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+        useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 5 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    );
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (over && active.id !== over.id) {
+            const oldIndex = sessions.findIndex((s) => s.id === active.id);
+            const newIndex = sessions.findIndex((s) => s.id === over.id);
+            const newOrder = arrayMove(sessions, oldIndex, newIndex);
+            onSessionsReorder(newOrder.map((s) => s.id));
+        }
+    };
+
+    return (
+        <div className="flex h-full flex-col overflow-hidden">
+            <div className="flex items-center justify-between p-4 pb-3 border-b border-border/40">
+                <span className="font-bold text-sm flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4 text-primary/80" /> 讨论组
+                </span>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 hover:bg-primary/10 hover:text-primary transition-colors"
+                    onClick={onSessionCreate}
+                    title="新建讨论组"
+                >
+                    <Plus className="h-4 w-4" />
+                </Button>
+            </div>
+
+            <ScrollArea className="flex-1 p-2">
+                {sessions.length === 0 ? (
+                    <div className="text-center py-8 text-xs text-muted-foreground italic">
+                        暂无讨论组，点击 + 号开启对话
+                    </div>
+                ) : (
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                        <SortableContext items={sessions.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+                            <div className="space-y-1">
+                                {sessions.map((s) => (
+                                    <SortableSessionItem
+                                        key={s.id}
+                                        session={s}
+                                        isActive={activeSessionId === s.id}
+                                        onClick={() => onSessionSelect(s.id)}
+                                        onDelete={() => onSessionDelete(s.id)}
+                                    />
+                                ))}
+                            </div>
+                        </SortableContext>
+                    </DndContext>
+                )}
+            </ScrollArea>
+
+            <div className="p-3 border-t border-border/40 mt-auto">
+                <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-2.5 px-3 h-10 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-xl transition-all duration-200"
+                    onClick={onSystemSettingsClick}
+                >
+                    <Settings className="h-4 w-4" />
+                    <span className="text-sm font-medium">系统设置</span>
+                </Button>
+            </div>
+        </div>
+    );
+}
+
+// --- MemberSidebar Component ---
+export function MemberSidebar({
     agents,
     onAgentEdit,
     onAgentCreate,
     onAgentDelete,
     onAgentCopy,
-    onAgentInvoke,
     onAgentsReorder,
     isLoading = false,
-    onMobileClose,
-}: SidebarProps) {
+    hasActiveSession,
+}: {
+    agents: Agent[];
+    onAgentEdit: (agent: Agent) => void;
+    onAgentCreate: () => void;
+    onAgentDelete: (name: string) => void;
+    onAgentCopy: (agent: Agent) => void;
+    onAgentsReorder: (orderedNames: string[]) => void;
+    isLoading?: boolean;
+    hasActiveSession: boolean;
+}) {
     const [activeMenuAgent, setActiveMenuAgent] = React.useState<string | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
 
-    // 点击外部关闭菜单
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -275,35 +328,13 @@ export function Sidebar({
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // dnd-kit sensors
     const sensors = useSensors(
-        useSensor(PointerSensor, {
-            activationConstraint: {
-                distance: 8, // 稍微增大移动阈值，确保点击按钮时不会误触发拖拽
-            },
-        }),
-        useSensor(TouchSensor, {
-            activationConstraint: {
-                delay: 300, // 移动端长按 300ms 开启拖拽
-                tolerance: 5,
-            },
-        }),
-        useSensor(KeyboardSensor, {
-            coordinateGetter: sortableKeyboardCoordinates,
-        })
+        useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+        useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 5 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
 
-    const handleSessionDragEnd = (event: DragEndEvent) => {
-        const { active, over } = event;
-        if (over && active.id !== over.id) {
-            const oldIndex = sessions.findIndex((s) => s.id === active.id);
-            const newIndex = sessions.findIndex((s) => s.id === over.id);
-            const newOrder = arrayMove(sessions, oldIndex, newIndex);
-            onSessionsReorder(newOrder.map((s) => s.id));
-        }
-    };
-
-    const handleAgentDragEnd = (event: DragEndEvent) => {
+    const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
         if (over && active.id !== over.id) {
             const oldIndex = agents.findIndex((a) => a.name === active.id);
@@ -313,132 +344,49 @@ export function Sidebar({
         }
     };
 
-    const handleSessionClick = (id: string) => {
-        onSessionSelect(id);
-        onMobileClose?.();
-    };
-
-    const handleAgentInvoke = (name: string) => {
-        onMobileClose?.();
-        onAgentInvoke(name);
-    };
-
     return (
-        <div className="flex h-full flex-col gap-4">
-            {/* Top: Sessions */}
-            <div className="flex-[0.8] rounded-xl border bg-card shadow-sm overflow-hidden flex flex-col">
-                <div className="flex items-center justify-between p-4 pb-2 border-b bg-muted/20">
-                    <span className="font-medium text-sm flex items-center gap-2">
-                        <MessageSquare className="h-4 w-4" /> 讨论组
-                    </span>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={onSessionCreate}
-                        title="新建讨论组"
-                    >
-                        <Plus className="h-4 w-4" />
-                    </Button>
-                </div>
-                <ScrollArea className="flex-1 p-2">
-                    {sessions.length === 0 ? (
-                        <div className="text-center py-8 text-xs text-muted-foreground">
-                            暂无讨论组<br />点击右上角 +号 新建
+        <div className="flex h-full flex-col overflow-hidden">
+            <div className="flex items-center justify-between p-4 pb-3 border-b border-border/40">
+                <span className="font-bold text-sm flex items-center gap-2">
+                    <Avatar className="h-4 w-4">
+                        <AvatarFallback className="text-[8px] bg-primary text-primary-foreground font-sans">
+                            AG
+                        </AvatarFallback>
+                    </Avatar>
+                    群成员 ({agents.length})
+                </span>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 hover:bg-primary/10 hover:text-primary transition-colors"
+                    onClick={onAgentCreate}
+                    title="添加 Agent"
+                >
+                    <Plus className="h-4 w-4" />
+                </Button>
+            </div>
+            <ScrollArea className="flex-1 p-2">
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                    <SortableContext items={agents.map((a) => a.name)} strategy={verticalListSortingStrategy}>
+                        <div className="space-y-2">
+                            {agents.map((a) => (
+                                <SortableAgentItem
+                                    key={a.name}
+                                    agent={a}
+                                    isLoading={isLoading}
+                                    hasActiveSession={hasActiveSession}
+                                    onEdit={() => { onAgentEdit(a); setActiveMenuAgent(null); }}
+                                    onCopy={() => { onAgentCopy(a); setActiveMenuAgent(null); }}
+                                    onDelete={() => { onAgentDelete(a.name); setActiveMenuAgent(null); }}
+                                    isMenuOpen={activeMenuAgent === a.name}
+                                    onMenuToggle={() => setActiveMenuAgent(activeMenuAgent === a.name ? null : a.name)}
+                                    menuRef={menuRef}
+                                />
+                            ))}
                         </div>
-                    ) : (
-                        <DndContext
-                            sensors={sensors}
-                            collisionDetection={closestCenter}
-                            onDragEnd={handleSessionDragEnd}
-                        >
-                            <SortableContext
-                                items={sessions.map((s) => s.id)}
-                                strategy={verticalListSortingStrategy}
-                            >
-                                <div className="space-y-1">
-                                    {sessions.map((s) => (
-                                        <SortableSessionItem
-                                            key={s.id}
-                                            session={s}
-                                            isActive={activeSessionId === s.id}
-                                            onClick={() => handleSessionClick(s.id)}
-                                            onDelete={() => onSessionDelete(s.id)}
-                                        />
-                                    ))}
-                                </div>
-                            </SortableContext>
-                        </DndContext>
-                    )}
-                </ScrollArea>
-            </div>
-
-            {/* Bottom: Agents */}
-            <div className="flex-1 rounded-xl border bg-card shadow-sm overflow-hidden flex flex-col min-h-0">
-                <div className="flex items-center justify-between p-4 pb-2 border-b bg-muted/20">
-                    <span className="font-medium text-sm flex items-center gap-2">
-                        <Avatar className="h-4 w-4">
-                            <AvatarImage src="" />
-                            <AvatarFallback className="text-[8px] bg-primary text-primary-foreground">
-                                AG
-                            </AvatarFallback>
-                        </Avatar>
-                        群成员 ({agents.length})
-                    </span>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={onAgentCreate}
-                        title="添加 Agent"
-                    >
-                        <Plus className="h-4 w-4" />
-                    </Button>
-                </div>
-                <ScrollArea className="flex-1 p-2 overflow-hidden">
-                    <DndContext
-                        sensors={sensors}
-                        collisionDetection={closestCenter}
-                        onDragEnd={handleAgentDragEnd}
-                    >
-                        <SortableContext
-                            items={agents.map((a) => a.name)}
-                            strategy={verticalListSortingStrategy}
-                        >
-                            <div className="space-y-2 max-w-full">
-                                {agents.map((a) => (
-                                    <SortableAgentItem
-                                        key={a.name}
-                                        agent={a}
-                                        isLoading={isLoading}
-                                        hasActiveSession={!!activeSessionId}
-                                        onInvoke={() => handleAgentInvoke(a.name)}
-                                        onEdit={() => {
-                                            onAgentEdit({ ...a });
-                                            setActiveMenuAgent(null);
-                                        }}
-                                        onCopy={() => {
-                                            onAgentCopy(a);
-                                            setActiveMenuAgent(null);
-                                        }}
-                                        onDelete={() => {
-                                            onAgentDelete(a.name);
-                                            setActiveMenuAgent(null);
-                                        }}
-                                        isMenuOpen={activeMenuAgent === a.name}
-                                        onMenuToggle={() =>
-                                            setActiveMenuAgent(
-                                                activeMenuAgent === a.name ? null : a.name
-                                            )
-                                        }
-                                        menuRef={menuRef}
-                                    />
-                                ))}
-                            </div>
-                        </SortableContext>
-                    </DndContext>
-                </ScrollArea>
-            </div>
+                    </SortableContext>
+                </DndContext>
+            </ScrollArea>
         </div>
     );
 }
