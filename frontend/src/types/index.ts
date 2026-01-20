@@ -1,11 +1,3 @@
-/**
- * 统一类型定义
- * 所有前端共享的类型都在这里定义
- * 
- * 注意：本项目的流式协议是后端自定义实现的，格式模仿 Vercel AI SDK 的 data-stream 规范，
- * 但并未使用 Vercel AI SDK 库。后端使用 OpenAI SDK 与 LLM 通信。
- */
-
 // === Agent 相关 ===
 
 export type Agent = {
@@ -13,7 +5,7 @@ export type Agent = {
     system_prompt: string;
     avatar_url?: string | null;
     model?: string | null;
-    temperature?: number | null;
+    custom_params?: Record<string, unknown> | null;  // 自定义请求参数，会被合并到 LLM 请求体中
     base_url?: string | null;
     api_key?: string | null;
     stream?: boolean;  // 是否启用流式输出，默认 true
