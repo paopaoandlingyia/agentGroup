@@ -11,7 +11,7 @@ const DEFAULT_AGENTS: Agent[] = [
         system_prompt: "你是一个经验丰富的产品经理，擅长拆解需求、定义MVP、提出可落地的产品方案。发言要条理清晰、关注用户价值与范围控制。",
         avatar_url: "https://api.dicebear.com/9.x/notionists-neutral/svg?seed=pm",
         model: null,
-        temperature: 0.6,
+        custom_params: { temperature: 0.6 },
         base_url: null,
         api_key: null,
         stream: true
@@ -21,7 +21,7 @@ const DEFAULT_AGENTS: Agent[] = [
         system_prompt: "你是一个偏工程实现的全栈程序员，强调可维护性、边界与可测试性。发言要具体、给出实现路径与注意事项。",
         avatar_url: "https://api.dicebear.com/9.x/notionists-neutral/svg?seed=dev",
         model: null,
-        temperature: 0.4,
+        custom_params: { temperature: 0.4 },
         base_url: null,
         api_key: null,
         stream: true
@@ -31,7 +31,7 @@ const DEFAULT_AGENTS: Agent[] = [
         system_prompt: "你是一个喜欢挑刺的路人杠精，专门寻找逻辑漏洞、边界条件与风险。发言要犀利但有建设性。",
         avatar_url: "https://api.dicebear.com/9.x/notionists-neutral/svg?seed=critic",
         model: null,
-        temperature: 0.8,
+        custom_params: { temperature: 0.8 },
         base_url: null,
         api_key: null,
         stream: true
