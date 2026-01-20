@@ -10,13 +10,14 @@ import { Agent, SessionSummary, shortName } from "@/types";
 // dnd-kit imports
 import {
     DndContext,
-    closestCenter,
+    closestCorners,
     KeyboardSensor,
     PointerSensor,
     TouchSensor,
     useSensor,
     useSensors,
     DragEndEvent,
+    DragStartEvent,
 } from "@dnd-kit/core";
 import {
     arrayMove,
@@ -46,12 +47,18 @@ function SortableSessionItem({
         transform,
         transition,
         isDragging,
-    } = useSortable({ id: session.id });
+    } = useSortable({
+        id: session.id,
+        transition: {
+            duration: 150,
+            easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
+        }
+    });
 
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
-        opacity: isDragging ? 0.5 : 1,
+        zIndex: isDragging ? 50 : undefined,
     };
 
     return (
@@ -60,10 +67,12 @@ function SortableSessionItem({
             style={{ ...style, touchAction: "none" }}
             {...attributes}
             {...listeners}
-            className={`session-item group relative flex items-center rounded-xl px-4 py-2.5 text-sm cursor-pointer overflow-hidden ${isActive
-                ? "active"
-                : "text-foreground/80"
-                } ${isDragging ? "z-50 shadow-lg !transform-none" : ""}`}
+            className={`session-item group relative flex items-center rounded-xl px-4 py-2.5 text-sm cursor-pointer overflow-hidden ${isDragging
+                ? "shadow-lg bg-card cursor-grabbing"
+                : isActive
+                    ? "active"
+                    : "text-foreground/80"
+                }`}
             onClick={onClick}
             title={session.name}
         >
@@ -118,12 +127,18 @@ function SortableAgentItem({
         transform,
         transition,
         isDragging,
-    } = useSortable({ id: agent.name });
+    } = useSortable({
+        id: agent.name,
+        transition: {
+            duration: 150,
+            easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
+        }
+    });
 
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
-        opacity: isDragging ? 0.5 : 1,
+        zIndex: isDragging ? 50 : undefined,
     };
 
     return (
@@ -132,7 +147,9 @@ function SortableAgentItem({
             style={{ ...style, touchAction: "none" }}
             {...attributes}
             {...listeners}
-            className={`group relative rounded-lg border border-transparent px-4 py-2.5 hover:bg-accent/50 hover:border-border transition-all cursor-pointer ${isDragging ? "z-50 shadow-lg bg-card" : ""
+            className={`group relative rounded-lg border px-4 py-2.5 transition-all cursor-pointer ${isDragging
+                ? "shadow-lg bg-card border-border cursor-grabbing"
+                : "border-transparent hover:bg-accent/50 hover:border-border"
                 }`}
         >
             <div
@@ -230,8 +247,15 @@ export function SessionSidebar({
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
 
+    const [activeId, setActiveId] = React.useState<string | null>(null);
+
+    const handleDragStart = (event: DragStartEvent) => {
+        setActiveId(String(event.active.id));
+    };
+
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
+        setActiveId(null);
         if (over && active.id !== over.id) {
             const oldIndex = sessions.findIndex((s) => s.id === active.id);
             const newIndex = sessions.findIndex((s) => s.id === over.id);
@@ -263,9 +287,15 @@ export function SessionSidebar({
                         暂无讨论组，点击 + 号开启对话
                     </div>
                 ) : (
-                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCorners}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
+                        onDragCancel={() => setActiveId(null)}
+                    >
                         <SortableContext items={sessions.map((s) => s.id)} strategy={verticalListSortingStrategy}>
-                            <div className="space-y-1">
+                            <div className={`space-y-1 ${activeId ? "[&_*]:transition-none" : ""}`}>
                                 {sessions.map((s) => (
                                     <SortableSessionItem
                                         key={s.id}
@@ -277,6 +307,7 @@ export function SessionSidebar({
                                 ))}
                             </div>
                         </SortableContext>
+
                     </DndContext>
                 )}
             </ScrollArea>
@@ -334,8 +365,15 @@ export function MemberSidebar({
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
 
+    const [activeId, setActiveId] = React.useState<string | null>(null);
+
+    const handleDragStart = (event: DragStartEvent) => {
+        setActiveId(String(event.active.id));
+    };
+
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
+        setActiveId(null);
         if (over && active.id !== over.id) {
             const oldIndex = agents.findIndex((a) => a.name === active.id);
             const newIndex = agents.findIndex((a) => a.name === over.id);
@@ -366,9 +404,15 @@ export function MemberSidebar({
                 </Button>
             </div>
             <ScrollArea className="flex-1 p-2">
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCorners}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                    onDragCancel={() => setActiveId(null)}
+                >
                     <SortableContext items={agents.map((a) => a.name)} strategy={verticalListSortingStrategy}>
-                        <div className="space-y-2">
+                        <div className={`space-y-2 ${activeId ? "[&_*]:transition-none" : ""}`}>
                             {agents.map((a) => (
                                 <SortableAgentItem
                                     key={a.name}
@@ -385,6 +429,7 @@ export function MemberSidebar({
                             ))}
                         </div>
                     </SortableContext>
+
                 </DndContext>
             </ScrollArea>
         </div>
