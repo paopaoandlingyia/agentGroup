@@ -33,9 +33,9 @@ type ProxyPayload = {
   base_url: string;
   api_key: string;
   model: string;
-  temperature: number;
   messages: OpenAiChatMessage[];
   stream: boolean;
+  custom_params?: Record<string, unknown>;
 };
 
 function speakerForItem(item: TranscriptItem): string {
@@ -104,7 +104,7 @@ export async function openAiChatCompletion(params: {
 
   const baseUrl = normalizeBaseUrl(params.agent.base_url ?? null);
   const model = (params.agent.model ?? "").trim() || "gpt-4o-mini";
-  const temperature = params.agent.temperature ?? 0.7;
+  const customParams = params.agent.custom_params ?? {};
 
   const pUrl = proxyUrl();
   // 既然 pUrl 现在总是有值（默认为 /api/llm），
@@ -116,9 +116,9 @@ export async function openAiChatCompletion(params: {
         base_url: baseUrl,
         api_key: apiKey,
         model,
-        temperature,
         messages: params.messages,
         stream: false,
+        custom_params: customParams,
       };
       res = await fetch(pUrl, {
         method: "POST",
@@ -153,8 +153,8 @@ export async function openAiChatCompletion(params: {
       body: JSON.stringify({
         model,
         messages: params.messages,
-        temperature,
         stream: false,
+        ...customParams,
       }),
       signal: params.signal,
     });
@@ -186,7 +186,7 @@ export async function openAiChatCompletionStream(params: {
 
   const baseUrl = normalizeBaseUrl(params.agent.base_url ?? null);
   const model = (params.agent.model ?? "").trim() || "gpt-4o-mini";
-  const temperature = params.agent.temperature ?? 0.7;
+  const customParams = params.agent.custom_params ?? {};
 
   const pUrl = proxyUrl();
   if (params.useProxy !== false) {
@@ -196,9 +196,9 @@ export async function openAiChatCompletionStream(params: {
         base_url: baseUrl,
         api_key: apiKey,
         model,
-        temperature,
         messages: params.messages,
         stream: true,
+        custom_params: customParams,
       };
       res = await fetch(pUrl, {
         method: "POST",
@@ -269,8 +269,8 @@ export async function openAiChatCompletionStream(params: {
       body: JSON.stringify({
         model,
         messages: params.messages,
-        temperature,
         stream: true,
+        ...customParams,
       }),
       signal: params.signal,
     });
