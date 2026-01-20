@@ -10,9 +10,9 @@ type ProxyChatRequest = {
   base_url: string;
   api_key: string;
   model: string;
-  temperature?: number;
   messages: OpenAiChatMessage[];
   stream?: boolean;
+  custom_params?: Record<string, unknown>;
 };
 
 function normalizeBaseUrl(input: string): string {
@@ -59,8 +59,8 @@ export async function POST(req: Request): Promise<Response> {
     body: JSON.stringify({
       model,
       messages: payload.messages,
-      temperature: payload.temperature ?? 0.7,
       stream: !!payload.stream,
+      ...(payload.custom_params ?? {}),
     }),
   });
 
