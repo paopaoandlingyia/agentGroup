@@ -317,7 +317,7 @@ export default function Home() {
       name: "",
       system_prompt: "你是一个有帮助的助手。",
       model: null,
-      temperature: 0.7,
+      custom_params: null,
       base_url: null,
       api_key: null,
       stream: true
