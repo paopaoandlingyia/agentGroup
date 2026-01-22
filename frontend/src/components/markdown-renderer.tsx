@@ -55,21 +55,23 @@ const CodeBlock = memo(function CodeBlock({
                     )}
                 </button>
             </div>
-            {/* Code Content */}
-            <SyntaxHighlighter
-                style={oneDark}
-                language={language || "text"}
-                PreTag="div"
-                customStyle={{
-                    margin: 0,
-                    padding: "1rem",
-                    background: "transparent",
-                    fontSize: "0.85rem",
-                    lineHeight: 1.5,
-                }}
-            >
-                {children}
-            </SyntaxHighlighter>
+            {/* Code Content - 支持水平滚动 */}
+            <div className="overflow-x-auto">
+                <SyntaxHighlighter
+                    style={oneDark}
+                    language={language || "text"}
+                    PreTag="div"
+                    customStyle={{
+                        margin: 0,
+                        padding: "1rem",
+                        background: "transparent",
+                        fontSize: "0.85rem",
+                        lineHeight: 1.5,
+                    }}
+                >
+                    {children}
+                </SyntaxHighlighter>
+            </div>
         </div>
     );
 });
@@ -80,7 +82,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
     className = "",
 }: MarkdownRendererProps) {
     return (
-        <div className={`markdown-body ${className}`}>
+        <div className={`markdown-body break-words overflow-hidden ${className}`} style={{ overflowWrap: "anywhere" }}>
             <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
@@ -106,7 +108,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
                             </code>
                         );
                     },
-                    // 链接 - 新窗口打开
+                    // 链接 - 新窗口打开，支持长URL换行
                     a({ href, children }) {
                         return (
                             <a
@@ -194,13 +196,13 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
                     hr() {
                         return <hr className="my-4 border-border/50" />;
                     },
-                    // 图片
+                    // 图片 - 确保不溢出容器
                     img({ src, alt }) {
                         return (
                             <img
                                 src={src}
                                 alt={alt || ""}
-                                className="max-w-full h-auto rounded-lg my-2 border border-border/30 shadow-sm"
+                                className="max-w-full w-auto h-auto rounded-lg my-2 border border-border/30 shadow-sm object-contain block"
                                 loading="lazy"
                             />
                         );
