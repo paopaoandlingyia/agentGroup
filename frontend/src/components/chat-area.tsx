@@ -164,22 +164,23 @@ export function ChatArea({
                             {/* Message Bubble */}
                             <div className={`flex flex-col min-w-0 ${item.kind === "user" ? "items-end" : "items-start"} ${item.kind === "system" ? "w-full" : "max-w-[calc(100%-48px)] sm:max-w-[85%]"
                                 }`}>
+                                {/* Agent Header - 移到气泡外部 */}
+                                {item.kind === "agent" && (
+                                    <div className="mb-1 flex items-center gap-2 select-none flex-wrap">
+                                        <span className="text-xs font-semibold text-foreground/90">{item.speaker}</span>
+                                        <span className="text-[9px] text-muted-foreground px-1.5 py-0.5 bg-muted/60 rounded-full truncate max-w-[120px]">
+                                            {agentsByName.get(item.speaker)?.model || "Default"}
+                                        </span>
+                                    </div>
+                                )}
+
+                                {/* 气泡本体 - 全圆角 */}
                                 <div className={`rounded-2xl px-4 py-2.5 text-sm shadow-sm leading-relaxed overflow-hidden min-w-0 max-w-full ${item.kind === "user"
-                                    ? "bg-primary text-primary-foreground rounded-tr-none"
+                                    ? "bg-primary text-primary-foreground"
                                     : item.kind === "system"
                                         ? "bg-muted/50 text-muted-foreground italic mx-auto text-[11px] border border-dashed rounded-lg"
-                                        : "bg-card border rounded-tl-none"
+                                        : "bg-card border"
                                     }`}>
-
-                                    {/* Agent Header */}
-                                    {item.kind === "agent" && (
-                                        <div className="mb-1 flex items-center gap-2 select-none flex-wrap">
-                                            <span className="text-xs font-bold text-primary">{item.speaker}</span>
-                                            <span className="text-[9px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded-full border truncate max-w-[120px]">
-                                                {agentsByName.get(item.speaker)?.model || "Default"}
-                                            </span>
-                                        </div>
-                                    )}
 
                                     {/* Content with proper overflow handling */}
                                     <div className="overflow-hidden min-w-0">
