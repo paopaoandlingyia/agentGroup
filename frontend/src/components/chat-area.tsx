@@ -39,9 +39,16 @@ export function ChatArea({
     // 判断是否在底部的阈值
     const BOTTOM_THRESHOLD = 50;
 
+    // 使用 ref 获取 ScrollArea 根元素
+    const scrollAreaRef = useRef<HTMLDivElement>(null);
+
     // 回调 ref：当 viewport 挂载时，保存其引用
-    const viewportRefCallback = useCallback((node: HTMLDivElement | null) => {
-        setViewport(node);
+    // 修改为使用 useEffect 从 scrollAreaRef 中查找 viewport，适配标准 shadcn 组件
+    useEffect(() => {
+        if (scrollAreaRef.current) {
+            const viewportNode = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]') as HTMLDivElement;
+            setViewport(viewportNode);
+        }
     }, []);
 
     // 检查是否在底部
@@ -131,11 +138,10 @@ export function ChatArea({
 
     return (
         <ScrollArea
+            ref={scrollAreaRef}
             className="flex-1 bg-background"
-            viewportRef={viewportRefCallback}
-            viewportProps={{ className: "p-4" }}
         >
-            <div className="flex flex-col gap-4 max-w-3xl mx-auto px-1 pb-4">
+            <div className="flex flex-col gap-4 max-w-3xl mx-auto px-1 pb-4 p-4">
                 {globalPrompt && (
                     <div className="mx-auto text-[10px] text-muted-foreground bg-muted/40 px-3 py-1 rounded-full mb-2 text-center">
                         💡 全局 Prompt 已启用: {globalPrompt}
