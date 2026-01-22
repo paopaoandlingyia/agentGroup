@@ -25,8 +25,17 @@ import {
     sortableKeyboardCoordinates,
     useSortable,
     verticalListSortingStrategy,
+    defaultAnimateLayoutChanges,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+
+// Custom animation strategy to prevent "flash" on drop
+const customAnimateLayoutChanges = (args: any) => {
+    if (args.wasDragging) {
+        return false;
+    }
+    return defaultAnimateLayoutChanges(args);
+};
 
 // --- Sortable Session Item ---
 function SortableSessionItem({
@@ -52,11 +61,12 @@ function SortableSessionItem({
         transition: {
             duration: 150,
             easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
-        }
+        },
+        animateLayoutChanges: customAnimateLayoutChanges,
     });
 
     const style = {
-        transform: CSS.Transform.toString(transform),
+        transform: CSS.Translate.toString(transform),
         transition,
         zIndex: isDragging ? 50 : undefined,
     };
@@ -132,11 +142,12 @@ function SortableAgentItem({
         transition: {
             duration: 150,
             easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
-        }
+        },
+        animateLayoutChanges: customAnimateLayoutChanges,
     });
 
     const style = {
-        transform: CSS.Transform.toString(transform),
+        transform: CSS.Translate.toString(transform),
         transition,
         zIndex: isDragging ? 50 : undefined,
     };
@@ -147,7 +158,7 @@ function SortableAgentItem({
             style={{ ...style, touchAction: "none" }}
             {...attributes}
             {...listeners}
-            className={`group relative rounded-lg border px-4 py-2.5 transition-all cursor-pointer ${isDragging
+            className={`group relative rounded-lg border px-4 py-2.5 transition-colors cursor-pointer ${isDragging
                 ? "shadow-lg bg-card border-border cursor-grabbing"
                 : "border-transparent hover:bg-accent/50 hover:border-border"
                 }`}
@@ -247,7 +258,12 @@ export function SessionSidebar({
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
 
+    const [items, setItems] = React.useState(sessions);
     const [activeId, setActiveId] = React.useState<string | null>(null);
+
+    useEffect(() => {
+        setItems(sessions);
+    }, [sessions]);
 
     const handleDragStart = (event: DragStartEvent) => {
         setActiveId(String(event.active.id));
@@ -257,9 +273,12 @@ export function SessionSidebar({
         const { active, over } = event;
         setActiveId(null);
         if (over && active.id !== over.id) {
-            const oldIndex = sessions.findIndex((s) => s.id === active.id);
-            const newIndex = sessions.findIndex((s) => s.id === over.id);
-            const newOrder = arrayMove(sessions, oldIndex, newIndex);
+            const oldIndex = items.findIndex((s) => s.id === active.id);
+            const newIndex = items.findIndex((s) => s.id === over.id);
+            const newOrder = arrayMove(items, oldIndex, newIndex);
+
+            // Optimistic update
+            setItems(newOrder);
             onSessionsReorder(newOrder.map((s) => s.id));
         }
     };
@@ -282,7 +301,7 @@ export function SessionSidebar({
             </div>
 
             <ScrollArea className="flex-1 p-2">
-                {sessions.length === 0 ? (
+                {items.length === 0 ? (
                     <div className="text-center py-8 text-xs text-muted-foreground italic">
                         暂无讨论组，点击 + 号开启对话
                     </div>
@@ -294,9 +313,9 @@ export function SessionSidebar({
                         onDragEnd={handleDragEnd}
                         onDragCancel={() => setActiveId(null)}
                     >
-                        <SortableContext items={sessions.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+                        <SortableContext items={items.map((s) => s.id)} strategy={verticalListSortingStrategy}>
                             <div className={`space-y-1 ${activeId ? "[&_*]:transition-none" : ""}`}>
-                                {sessions.map((s) => (
+                                {items.map((s) => (
                                     <SortableSessionItem
                                         key={s.id}
                                         session={s}
@@ -365,7 +384,12 @@ export function MemberSidebar({
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
 
+    const [items, setItems] = React.useState(agents);
     const [activeId, setActiveId] = React.useState<string | null>(null);
+
+    useEffect(() => {
+        setItems(agents);
+    }, [agents]);
 
     const handleDragStart = (event: DragStartEvent) => {
         setActiveId(String(event.active.id));
@@ -375,9 +399,12 @@ export function MemberSidebar({
         const { active, over } = event;
         setActiveId(null);
         if (over && active.id !== over.id) {
-            const oldIndex = agents.findIndex((a) => a.name === active.id);
-            const newIndex = agents.findIndex((a) => a.name === over.id);
-            const newOrder = arrayMove(agents, oldIndex, newIndex);
+            const oldIndex = items.findIndex((a) => a.name === active.id);
+            const newIndex = items.findIndex((a) => a.name === over.id);
+            const newOrder = arrayMove(items, oldIndex, newIndex);
+
+            // Optimistic update
+            setItems(newOrder);
             onAgentsReorder(newOrder.map((a) => a.name));
         }
     };
@@ -391,7 +418,7 @@ export function MemberSidebar({
                             AG
                         </AvatarFallback>
                     </Avatar>
-                    群成员 ({agents.length})
+                    群成员 ({items.length})
                 </span>
                 <Button
                     variant="ghost"
@@ -411,9 +438,9 @@ export function MemberSidebar({
                     onDragEnd={handleDragEnd}
                     onDragCancel={() => setActiveId(null)}
                 >
-                    <SortableContext items={agents.map((a) => a.name)} strategy={verticalListSortingStrategy}>
+                    <SortableContext items={items.map((a) => a.name)} strategy={verticalListSortingStrategy}>
                         <div className={`space-y-2 ${activeId ? "[&_*]:transition-none" : ""}`}>
-                            {agents.map((a) => (
+                            {items.map((a) => (
                                 <SortableAgentItem
                                     key={a.name}
                                     agent={a}
