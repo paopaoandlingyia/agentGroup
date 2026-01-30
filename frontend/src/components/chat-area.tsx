@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useLayoutEffect, useState, useCallback } from "react";
 import { Pencil, Trash2, MessageSquare, GitBranch } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -31,24 +31,16 @@ export function ChatArea({
     // 使用 state 存储 viewport 元素，确保在元素可用时触发重新渲染
     const [viewport, setViewport] = useState<HTMLDivElement | null>(null);
     const lastTranscriptLength = useRef(transcript.length);
-    // 改用 state，确保用户交互后能正确阻止自动滚动
-    const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
-    // 用于防止 scroll 事件在我们程序化滚动时误判
-    const isProgrammaticScroll = useRef(false);
+    // 使用 ref 追踪自动滚动状态（只有“贴在底部”时才跟随流式输出）
+    const isAutoScrollEnabledRef = useRef(true);
+    // 追踪上一次的 scrollTop，用于检测用户是否主动向上滚动
+    const lastScrollTopRef = useRef(0);
 
     // 判断是否在底部的阈值
     const BOTTOM_THRESHOLD = 50;
 
-    // 使用 ref 获取 ScrollArea 根元素
-    const scrollAreaRef = useRef<HTMLDivElement>(null);
-
-    // 回调 ref：当 viewport 挂载时，保存其引用
-    // 修改为使用 useEffect 从 scrollAreaRef 中查找 viewport，适配标准 shadcn 组件
-    useEffect(() => {
-        if (scrollAreaRef.current) {
-            const viewportNode = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]') as HTMLDivElement;
-            setViewport(viewportNode);
-        }
+    const handleViewportRef = useCallback((node: HTMLDivElement | null) => {
+        setViewport(node);
     }, []);
 
     // 检查是否在底部
@@ -57,74 +49,49 @@ export function ChatArea({
         return viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < BOTTOM_THRESHOLD;
     }, [viewport]);
 
-    // 注册滚动相关的事件监听器
+    // 注册滚动事件监听器
     useEffect(() => {
         if (!viewport) return;
 
-        // 监听用户主动交互：滚轮、触摸、鼠标按下滚动条
-        const handleUserInteraction = () => {
-            // 用户主动交互，立即禁用自动滚动
-            setIsAutoScrollEnabled(false);
-        };
-
-        // 监听滚动结束，检测用户是否回到了底部
         const handleScroll = () => {
-            // 如果是程序化滚动，忽略
-            if (isProgrammaticScroll.current) return;
+            const currentScrollTop = viewport.scrollTop;
+            const previousScrollTop = lastScrollTopRef.current;
 
-            // 用户滚动后，检查是否回到底部
-            if (checkIfAtBottom()) {
-                setIsAutoScrollEnabled(true);
+            // 用户主动向上滚动（scrollTop 减少）则禁用自动滚动；回到底部则恢复。
+            const isScrollingUp = currentScrollTop < previousScrollTop - 5; // 5px 容差，避免抖动
+            if (isScrollingUp) {
+                isAutoScrollEnabledRef.current = false;
+            } else if (checkIfAtBottom()) {
+                isAutoScrollEnabledRef.current = true;
             }
+
+            lastScrollTopRef.current = currentScrollTop;
         };
 
-        // wheel 事件：用户滚轮滚动
-        viewport.addEventListener("wheel", handleUserInteraction, { passive: true });
-        // touchmove 事件：触摸滑动
-        viewport.addEventListener("touchmove", handleUserInteraction, { passive: true });
-        // pointerdown 事件：用户点击/拖动滚动条
-        viewport.addEventListener("pointerdown", handleUserInteraction, { passive: true });
-        // scroll 事件：检测是否回到底部
         viewport.addEventListener("scroll", handleScroll, { passive: true });
+        // 初始化一次，避免首次渲染时状态不同步
+        handleScroll();
 
         return () => {
-            viewport.removeEventListener("wheel", handleUserInteraction);
-            viewport.removeEventListener("touchmove", handleUserInteraction);
-            viewport.removeEventListener("pointerdown", handleUserInteraction);
             viewport.removeEventListener("scroll", handleScroll);
         };
     }, [viewport, checkIfAtBottom]);
 
-    // 处理滚动逻辑
-    useEffect(() => {
+    // 处理滚动逻辑 - 使用 useLayoutEffect 确保在 DOM 更新后、浏览器绑定前同步执行
+    useLayoutEffect(() => {
         if (!viewport) return;
 
         // 1. 判断是否是新消息开始（长度增加了）
         const isNewMessage = transcript.length > lastTranscriptLength.current;
         lastTranscriptLength.current = transcript.length;
 
-        // 2. 如果是用户发了新消息，强制开启自动滚动
-        if (isNewMessage) {
-            setIsAutoScrollEnabled(true);
-        }
+        // 2. 只有当自动滚动启用时才执行滚动（用户主动上滑后，不应被流式输出“拽回去”）
+        if (!isAutoScrollEnabledRef.current) return;
 
-        // 3. 执行滚动（只有当自动滚动启用时）
-        if (isAutoScrollEnabled || isNewMessage) {
-            const behavior = (isNewMessage && shouldSmoothScroll.current) ? "smooth" : "instant";
-
-            isProgrammaticScroll.current = true;
-            requestAnimationFrame(() => {
-                viewport.scrollTo({
-                    top: viewport.scrollHeight,
-                    behavior: behavior
-                });
-                // 延迟重置标志，确保 scroll 事件处理完毕
-                setTimeout(() => {
-                    isProgrammaticScroll.current = false;
-                }, 100);
-            });
-        }
-    }, [transcript, shouldSmoothScroll, viewport, isAutoScrollEnabled]);
+        const behavior: ScrollBehavior = (isNewMessage && shouldSmoothScroll.current) ? "smooth" : "auto";
+        // useLayoutEffect 已经在 DOM 更新后同步执行，这里直接滚动即可。
+        viewport.scrollTo({ top: viewport.scrollHeight, behavior });
+    }, [transcript, shouldSmoothScroll, viewport]);
 
     if (isEmpty) {
         return (
@@ -138,7 +105,7 @@ export function ChatArea({
 
     return (
         <ScrollArea
-            ref={scrollAreaRef}
+            viewportRef={handleViewportRef}
             className="flex-1 bg-background"
         >
             <div className="flex flex-col gap-4 max-w-3xl mx-auto px-1 pb-4 p-4">
